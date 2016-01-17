@@ -1,16 +1,17 @@
-const NODE_ENV = require('../lib/environment');
+import _debug from 'debug'
 
-module.exports = exports = {
+const debug = _debug('app:config')
+debug('Create configuration.')
+import base from './_base'
 
-  // environment
-  __DEBUG__ : NODE_ENV === 'development',
+debug(`Apply environment overrides for NODE_ENV "${base.env}".`)
+let overrides
+try {
+  overrides = require(`./_${base.env}`)(base)
+} catch (e) {
+  debug(
+    `No configuration overrides found for NODE_ENV "${base.env}"`
+  )
+}
 
-  // build system
-  VENDOR_DEPENDENCIES : ['react'],
-  SRC_DIRNAME  : 'app',
-  DIST_DIRNAME : 'dist',
-
-  // server
-  WEBPACK_PORT : 2000,
-  SERVER_PORT  : 3000
-};
+export default Object.assign({}, base, overrides)
