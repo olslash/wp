@@ -1,53 +1,110 @@
-import React, { PropTypes } from 'react'
-import { connect } from 'react-redux'
-import { Link } from 'react-router'
-import { actions as counterActions } from '../../redux/modules/counter'
-import DuckImage from './Duck.jpg'
-import classes from './HomeView.scss'
-
-// We define mapStateToProps where we'd normally use
-// the @connect decorator so the data requirements are clear upfront, but then
-// export the decorated component after the main class definition so
-// the component can be tested w/ and w/o being connected.
-// See: http://rackt.github.io/redux/docs/recipes/WritingTests.html
-const mapStateToProps = (state) => ({
-  counter: state.counter
-})
-export class HomeView extends React.Component {
+import { takeWhile, compact } from 'lodash'
+import React from 'react'
+// import { Link } from 'react-router'
+export default class HomeView extends React.Component {
   static propTypes = {
-    counter: PropTypes.number.isRequired,
-    doubleAsync: PropTypes.func.isRequired,
-    increment: PropTypes.func.isRequired
+
   };
 
+  state = {
+    containerWidth: 0
+  };
+
+  componentDidMount () {
+    this.setState({
+      containerWidth: this.refs.container.offsetWidth
+    })
+
+    window.addEventListener('resize', this.handleResize)
+  }
+
+  componentWillUnmount () {
+    window.removeEventListener('resize', this.handleResize)
+  }
+
+  handleResize = () => {
+    this.setState({
+      containerWidth: this.refs.container.offsetWidth
+    })
+  };
+
+  getRows (images, idealRowHeight) {
+    let cursor = 0
+
+    const rows = images.map(() => {
+      let currentRowWidth = 0
+
+      const row = takeWhile(images.slice(cursor), (image) => {
+        const scaledImageWidth = idealRowHeight * aspectRatio(image)
+        const newRowWidth = currentRowWidth + scaledImageWidth
+
+        // reject images that would push this row over the max width
+        if (newRowWidth > this.state.containerWidth) {
+          return false
+        }
+
+        cursor += 1
+        currentRowWidth = newRowWidth
+        return true
+      })
+
+      return row.length > 0 ? row : null
+    })
+
+    return compact(rows)
+  }
+
+  getRowWidth (row, idealRowHeight) {
+    return row.reduce((width, image) => {
+      const scaledWidth = idealRowHeight * aspectRatio(image)
+
+      return width + scaledWidth
+    }, 0)
+  }
+
   render () {
+    const idealRowHeight = 200
+    const rows = this.getRows(images, idealRowHeight)
+
     return (
-      <div className='container text-center'>
-        <div className='row'>
-          <div className='col-xs-2 col-xs-offset-5'>
-            <img className={classes.duck}
-                 src={DuckImage}
-                 alt='This is a duck, because Redux.' />
-          </div>
-        </div>
-        <h1>Welcome to the React Redux Starter Kit</h1>
-        <h2>
-          Sample Counter:&nbsp;
-          <span className={classes['counter--green']}>{this.props.counter}</span>
-        </h2>
-        <button className='btn btn-default'
-                onClick={() => this.props.increment(1)}>
-          Increment
-        </button>
-        <button className='btn btn-default'
-                onClick={this.props.doubleAsync}>
-          Double (Async)
-        </button>
-        <hr />
-        <Link to='/404'>Go to 404 Page</Link>
+      <div className=''
+           ref='container'>
+        {
+          rows.map(row => {
+            const rowAspectRatio = aspectRatio({
+              width: this.getRowWidth(row, idealRowHeight),
+              height: idealRowHeight
+            })
+
+            // need to stay 1 pixel away from container edge to prevent browser reflow issues
+            const scaledRowHeight = (this.state.containerWidth - 1) / rowAspectRatio
+
+            return row.map(image => {
+              const scaledWidth = scaledRowHeight * aspectRatio(image)
+
+              return (
+                <img src={ image.src }
+                     width={ scaledWidth }
+                     height={ scaledRowHeight }/>
+              )
+            })
+          })
+        }
       </div>
     )
   }
 }
 
-export default connect(mapStateToProps, counterActions)(HomeView)
+function requireAll (r) {
+  return r.keys().map(r)
+}
+
+const images = requireAll(require.context(
+  '../../static/images',
+  true, // include subdirectories
+  /\.(png|jpg|jpeg)$/
+))
+
+function aspectRatio ({width, height}) {
+  return width / height
+}
